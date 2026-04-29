@@ -1,39 +1,19 @@
-name: Sync with header
+- name: Download external file
+  run: |
+    if ! curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt; then
+      echo "Download failed"
+      exit 0
+    fi
 
-on:
-  schedule:
-    - cron: "*/30 * * * *"
-  workflow_dispatch:
+- name: Merge header + external
+  run: |
+    cat header.txt external.txt > combined.txt
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download external file
-        run: |
-          curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt
-
-      - name: Merge header + external
-        run: |
-          cat white/header.txt external.txt > combined.txt
-
-      - name: Update if changed
-        run: |
-          if ! cmp -s combined.txt vless_lite.txt; then
-            mv combined.txt vless_lite.txt
-            echo "changed=true" >> $GITHUB_ENV
-          else
-            rm combined.txt
-          fi
-
-      - name: Commit
-        if: env.changed == 'true'
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@users.noreply.github.com"
-          git add vless_lite.txt
-          git commit -m "auto: update merged list"
-          git push
+- name: Update if changed
+  run: |
+    if [ ! -f vless_lite.txt ] || ! cmp -s combined.txt vless_lite.txt; then
+      mv combined.txt vless_lite.txt
+      echo "changed=true" >> $GITHUB_ENV
+    else
+      rm combined.txt
+    fi
