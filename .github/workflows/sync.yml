@@ -1,4 +1,4 @@
-name: Sync with header
+name: Sync whitelist
 
 on:
   schedule:
