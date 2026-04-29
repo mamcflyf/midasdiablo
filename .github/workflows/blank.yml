@@ -1,0 +1,59 @@
+name: Sync with header
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Debug repo structure
+        run: |
+          echo "FILES:"
+          ls -la
+
+      - name: Download external file
+        run: |
+          if ! curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt; then
+            echo "Download failed, skipping update"
+            exit 0
+          fi
+
+      - name: Validate header exists
+        run: |
+          if [ ! -f header.txt ]; then
+            echo "ERROR: header.txt not found"
+            exit 1
+          fi
+
+      - name: Merge header + external
+        run: |
+          cat header.txt external.txt > combined.txt
+
+      - name: Update if changed
+        run: |
+          if [ ! -f vless_lite.txt ] || ! cmp -s combined.txt vless_lite.txt; then
+            mv combined.txt vless_lite.txt
+            echo "changed=true" >> $GITHUB_ENV
+          else
+            echo "No changes"
+            rm combined.txt
+          fi
+
+      - name: Commit changes
+        if: env.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add vless_lite.txt
+          git commit -m "auto: update merged list"
+          git push
