@@ -1,19 +1,84 @@
-- name: Download external file
-  run: |
-    if ! curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt; then
-      echo "Download failed"
-      exit 0
-    fi
+name: Sync with header
 
-- name: Merge header + external
-  run: |
-    cat header.txt external.txt > combined.txt
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
 
-- name: Update if changed
-  run: |
-    if [ ! -f vless_lite.txt ] || ! cmp -s combined.txt vless_lite.txt; then
-      mv combined.txt vless_lite.txt
-      echo "changed=true" >> $GITHUB_ENV
-    else
-      rm combined.txt
-    fi
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Debug environment
+        run: |
+          echo "=== PWD ==="
+          pwd
+          echo "=== FILES ==="
+          ls -la
+
+      - name: Check header.txt
+        run: |
+          if [ ! -f header.txt ]; then
+            echo "ERROR: header.txt not found in repo root"
+            exit 1
+          fi
+
+          echo "=== HEADER CONTENT ==="
+          cat header.txt
+
+      - name: Download external file
+        run: |
+          echo "Downloading external file..."
+          if ! curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt; then
+            echo "ERROR: download failed"
+            exit 0
+          fi
+
+          if [ ! -s external.txt ]; then
+            echo "ERROR: external file is empty"
+            exit 0
+          fi
+
+          echo "=== EXTERNAL PREVIEW ==="
+          head -n 5 external.txt
+
+      - name: Merge files
+        run: |
+          cat header.txt external.txt > combined.txt
+
+          echo "=== COMBINED PREVIEW ==="
+          head -n 10 combined.txt
+
+      - name: Update file if changed
+        run: |
+          if [ ! -f vless_lite.txt ]; then
+            echo "First run: creating file"
+            mv combined.txt vless_lite.txt
+            echo "changed=true" >> $GITHUB_ENV
+            exit 0
+          fi
+
+          if cmp -s combined.txt vless_lite.txt; then
+            echo "No changes"
+            rm combined.txt
+          else
+            echo "File updated"
+            mv combined.txt vless_lite.txt
+            echo "changed=true" >> $GITHUB_ENV
+          fi
+
+      - name: Commit changes
+        if: env.changed == 'true'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add vless_lite.txt
+          git commit -m "auto: update merged list"
+          git push
