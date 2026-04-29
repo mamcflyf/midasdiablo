@@ -25,13 +25,13 @@ jobs:
 
       - name: Check header.txt
         run: |
-          if [ ! -f white/header.txt ]; then
+          if [ ! -f header.txt ]; then
             echo "ERROR: header.txt not found in repo root"
             exit 1
           fi
 
           echo "=== HEADER CONTENT ==="
-          cat white/header.txt
+          cat header.txt
 
       - name: Download external file
         run: |
@@ -51,7 +51,7 @@ jobs:
 
       - name: Merge files
         run: |
-          cat white/header.txt external.txt > combined.txt
+          cat header.txt external.txt > combined.txt
 
           echo "=== COMBINED PREVIEW ==="
           head -n 10 combined.txt
