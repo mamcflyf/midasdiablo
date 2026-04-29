@@ -16,44 +16,55 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Debug repo structure
+      - name: Show files (debug)
         run: |
-          echo "FILES:"
+          echo "=== FILES ==="
           ls -la
 
-      - name: Download external file
-        run: |
-          if ! curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt; then
-            echo "Download failed, skipping update"
-            exit 0
-          fi
-
-      - name: Validate header exists
+      - name: Ensure header exists
         run: |
           if [ ! -f header.txt ]; then
-            echo "ERROR: header.txt not found"
+            echo "header.txt not found"
             exit 1
           fi
 
-      - name: Merge header + external
+      - name: Download external file (safe)
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/zieng2/wl/main/vless_lite.txt -o external.txt || {
+            echo "Download failed, skip update"
+            exit 0
+          }
+
+          if [ ! -s external.txt ]; then
+            echo "Downloaded file is empty, skip"
+            exit 0
+          fi
+
+      - name: Merge files
         run: |
           cat header.txt external.txt > combined.txt
 
-      - name: Update if changed
+      - name: Update only if changed
         run: |
-          if [ ! -f vless_lite.txt ] || ! cmp -s combined.txt vless_lite.txt; then
+          if [ ! -f vless_lite.txt ]; then
             mv combined.txt vless_lite.txt
             echo "changed=true" >> $GITHUB_ENV
-          else
-            echo "No changes"
-            rm combined.txt
+            exit 0
           fi
 
-      - name: Commit changes
+          if cmp -s combined.txt vless_lite.txt; then
+            echo "No changes"
+            rm combined.txt
+          else
+            mv combined.txt vless_lite.txt
+            echo "changed=true" >> $GITHUB_ENV
+          fi
+
+      - name: Commit
         if: env.changed == 'true'
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
           git add vless_lite.txt
-          git commit -m "auto: update merged list"
+          git commit -m "auto: update list"
           git push
